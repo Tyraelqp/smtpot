@@ -1,0 +1,18 @@
+version: "3.7"
+
+networks:
+  smtpot:
+    name: smtpot
+
+services:
+  php:
+    image: php:8.2.10-alpine
+    entrypoint: "php /app/server.php"
+    container_name: smtpot
+    working_dir: /app
+    volumes:
+      - .:/app:cached
+    networks:
+      - smtpot
+    ports:
+      - "2525:25"
