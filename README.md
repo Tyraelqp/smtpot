@@ -1,4 +1,6 @@
-![SMTPot](logo.png)
+<p align="center">
+    <img src="logo.png" alt="SMTPot">
+</p>
 
 # SMTPot
 A witch pot for your emails.
