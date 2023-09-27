@@ -15,5 +15,9 @@
             "email": "tyraelqp@gmail.com"
         }
     ],
-    "require": {}
+    "require": {
+        "php": "^8.0",
+        "ext-pcntl": "*",
+        "ext-sockets": "*"
+    }
 }

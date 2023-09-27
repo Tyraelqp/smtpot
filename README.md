@@ -13,7 +13,7 @@ SMTPot is a simple SMTP server which accept emails and passes them to you handle
 
 One of:
 
-* PHP 8.0+ + composer
+* PHP 8.0+, ext-pcntl, ext-sockets, composer
 * [Docker](https://www.docker.com)
 
 ---

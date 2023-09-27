@@ -2,7 +2,6 @@
 
 declare(ticks = 1);
 
-use Smtpot\HandlerInterface;
 use SMTPot\Handlers\HandlerInterface;
 
 require_once __DIR__ . '/vendor/autoload.php';
@@ -47,49 +46,6 @@ try {
     exit(1);
 }
 
-function readInput(Socket $socket): string|false
-{
-    $input = socket_read($socket, 1024);
-
-    if (empty($input)) {
-        return $input;
-    }
-
-    if (str_contains($input, "\r\n")) {
-        return $input;
-    }
-
-    while (false !== $row = socket_read($socket, 1024)) {
-        $input .= $row;
-
-        if (str_contains($input, "\r\n")) {
-            break;
-        }
-    }
-
-    return $input;
-}
-
-function respond(Socket $socket, int $code, string $response): void
-{
-    debug("Server: $code $response");
-    socket_write($socket, "$code $response" . "\n");
-}
-
-function onClose(): void
-{
-    global $connections;
-    global $socket;
-
-    foreach ($connections as $connection) {
-        socket_close($connection);
-    }
-
-    socket_close($socket);
-    debug('Server stopped');
-    exit(0);
-}
-
 pcntl_signal(SIGTERM, "onClose");
 pcntl_signal(SIGHUP, "onClose");
 pcntl_signal(SIGINT, "onClose");
@@ -122,7 +78,7 @@ while (true) {
         debug("Log: New connection from $clientIp");
 
         $connections[] = [
-            'lastMessageAt' => time(),
+            'lastInputTime' => time(),
             'socket' => $conn,
         ];
         $lastInputTime = time();
@@ -131,10 +87,13 @@ while (true) {
     }
 
     foreach ($connections as $i => $conn) {
-        if ($conn['lastMessageAt'] < time() - READ_TIMEOUT) {
-            socket_close($conn['socket']);
+        $clientSocket = $conn['socket'];
+
+        if ($conn['lastInputTime'] < time() - READ_TIMEOUT) {
+            socket_close($clientSocket);
             unset($connections[$i], $toSend[$i]);
             debug('Client disconnected by timeout');
+
             continue;
         }
 
@@ -143,16 +102,17 @@ while (true) {
                 $toSend[$i]['body'] = '';
             }
 
-            while (false !== $row = readInput($conn['socket'])) {
+            while (false !== $row = readInput($clientSocket)) {
                 if (empty($row)) {
-                    socket_close($conn['socket']);
+                    socket_close($clientSocket);
                     unset($connections[$i], $toSend[$i]);
                     debug('Client disconnected');
+
                     break;
                 }
 
                 $toSend[$i]['body'] .= $row;
-                $conn['lastMessageAt'] = time();
+                $conn['lastInputTime'] = time();
             }
 
             if (isset($toSend[$i]) && preg_match('/\r\n\.\r\n/', $toSend[$i]['body'])) {
@@ -162,7 +122,7 @@ while (true) {
                     static fn(int $ii) => $ii !== $i,
                 );
 
-                respond($conn['socket'], 250, 'Ok: queued as ' . ++$sendCount);
+                respond($clientSocket, 250, 'Ok: queued as ' . ++$sendCount);
 
                 [$headers, $body] = preg_split('/(\r?\n){2}/', $toSend[$i]['body'], 2);
                 $toSend[$i]['body'] = trim($body);
@@ -192,20 +152,20 @@ while (true) {
             continue;
         }
 
-        $input = readInput($conn['socket']);
+        $input = readInput($clientSocket);
 
         if (false === $input) {
             continue;
         }
 
         if (empty($input)) {
-            socket_close($conn['socket']);
+            socket_close($clientSocket);
             unset($connections[$i], $toSend[$i]);
             debug('Client disconnected');
             continue;
         }
 
-        $conn['lastMessageAt'] = time();
+        $conn['lastInputTime'] = time();
 
         debug("Client: $input");
 
@@ -223,12 +183,12 @@ while (true) {
             case 'HELO':
             case 'EHLO':
                 if (1 === count($args)) {
-                    respond($conn['socket'], 501, "Syntax: {$args[0]} hostname");
+                    respond($clientSocket, 501, "Syntax: {$args[0]} hostname");
                     break;
                 }
 
                 $args[1] = trim($args[1]);
-                respond($conn['socket'], 250, "Hello {$args[1]}");
+                respond($clientSocket, 250, "Hello {$args[1]}");
                 break;
             case 'MAIL':
                 if (!preg_match('/FROM:<([^>]+)>/', $args[1], $from)) {
@@ -243,7 +203,7 @@ while (true) {
                     'body' => null,
                 ];
 
-                respond($conn['socket'], 250, 'Ok');
+                respond($clientSocket, 250, 'Ok');
                 break;
             case 'RCPT':
                 if (!preg_match('/TO:<([^>]+)>/', $args[1], $to)) {
@@ -253,36 +213,36 @@ while (true) {
 
                 $toSend[$i]['to'][] = $to[1];
 
-                respond($conn['socket'], 250, 'Ok');
+                respond($clientSocket, 250, 'Ok');
                 break;
             case 'DATA':
                 $readingDataFrom[] = $i;
-                respond($conn['socket'], 354, 'End data with CRLF.CRLF');
+                respond($clientSocket, 354, 'End data with CRLF.CRLF');
                 break;
             case 'QUIT':
-                respond($conn['socket'], 221, 'Bye');
-                socket_close($conn['socket']);
+                respond($clientSocket, 221, 'Bye');
+                socket_close($clientSocket);
                 unset($connections[$i], $toSend[$i]);
                 break;
             case 'NOOP':
-                respond($conn['socket'], 250, 'Ok');
+                respond($clientSocket, 250, 'Ok');
                 break;
             case 'HNDL':
                 if (1 === count($args)) {
-                    respond($conn['socket'], 501, "Syntax: {$args[0]} payload");
+                    respond($clientSocket, 501, "Syntax: {$args[0]} payload");
                     break;
                 }
 
                 try {
-                    respond($conn['socket'], 250, $handler->handleCommand(trim($args[1])));
+                    respond($clientSocket, 250, $handler->handleCommand(trim($args[1])));
                 } catch (Throwable $e) {
-                    respond($conn['socket'], 500, $e->getMessage());
+                    respond($clientSocket, 500, $e->getMessage());
                 }
 
                 break;
             default:
                 debug("Unknown command: $args[0]");
-                respond($conn['socket'], 250, 'Ok');
+                respond($clientSocket, 250, 'Ok');
         }
     }
 }
