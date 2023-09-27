@@ -1,6 +1,6 @@
 <?php
 
-namespace Smtpot;
+namespace SMTPot\Handlers;
 
 interface HandlerInterface
 {

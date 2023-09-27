@@ -1,8 +1,8 @@
 <?php
 
-use Smtpot\HandlerInterface;
+use SMTPot\Handlers\HandlerInterface;
 
-require_once __DIR__ . '/handler/Smtpot/HandlerInterface.php';
+require_once __DIR__ . '/vendor/autoload.php';
 
 const CONFIG_FILENAME = __DIR__ . '/config.php';
 const NO_ACTIVITY_THRESHOLD = 2;
@@ -41,23 +41,6 @@ try {
 } catch (Throwable $e) {
     error_log("Error: {$e->getMessage()}");
     exit(1);
-}
-
-function respond($resource, int $code, string $response): void
-{
-    debug("Server: $code $response");
-    fwrite($resource, "$code $response" . "\n");
-}
-
-function debug(string $message): void
-{
-    global $config;
-
-    if (!($config['debug'] ?? false)) {
-        return;
-    }
-
-    error_log(trim($message));
 }
 
 $address = sprintf('tcp://0.0.0.0:%d', $config['port'] ?? 25);
@@ -127,7 +110,7 @@ while (true) {
                         ['; ', ''],
                         $value,
                     );
-                    $toSend[$i]['headers'][strtolower($name)] = trim($value);
+                    $toSend[$i]['headers'][strtolower(trim($name))][] = trim($value);
                 }
 
                 try {
@@ -172,7 +155,10 @@ while (true) {
                 respond($conn, 250, "Hello {$args[1]}");
                 break;
             case 'MAIL':
-                preg_match('/FROM:<([^>]+)>/', $args[1], $from);
+                if (!preg_match('/FROM:<([^>]+)>/', $args[1], $from)) {
+                    respond($conn, 501, "Syntax: MAIL FROM:<address>");
+                    break;
+                }
 
                 $toSend[$i] = [
                     'from' => $from[1],
@@ -184,7 +170,10 @@ while (true) {
                 respond($conn, 250, 'Ok');
                 break;
             case 'RCPT':
-                preg_match('/TO:<([^>]+)>/', $args[1], $to);
+                if (!preg_match('/TO:<([^>]+)>/', $args[1], $to)) {
+                    respond($conn, 501, "Syntax: RCPT TO:<address>");
+                    break;
+                }
 
                 $toSend[$i]['to'][] = $to[1];
 

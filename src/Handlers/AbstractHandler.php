@@ -1,10 +1,8 @@
 <?php
 
-namespace Smtpot;
+namespace SMTPot\Handlers;
 
 use RuntimeException;
-
-require_once __DIR__ . '/HandlerInterface.php';
 
 abstract class AbstractHandler implements HandlerInterface
 {

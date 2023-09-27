@@ -13,7 +13,7 @@ SMTPot is a simple SMTP server which accept emails and passes them to you handle
 
 One of:
 
-* PHP 7.4+
+* PHP 7.4+ + composer
 * [Docker](https://www.docker.com)
 
 ---
@@ -21,9 +21,10 @@ One of:
 ## Project setup
 
 ```shell
-git clone git@github.com:Tyraelqp/smtpot.git
+git clone https://github.com/Tyraelqp/smtpot.git
 cd smtpot
 cp config.example.php config.php
+cp .env.example .env
 ```
 
 Now you can change default configuration for your needs (WARNING! Do not change `port` if you want to use docker).
@@ -40,7 +41,7 @@ Server will pass email data as first argument to your handler. Email data scheme
 {
     "from": string,
     "to": Array<int, string>,
-    "headers": Array<string, string>,
+    "headers": Array<string, string[]>,
     "body": string
 }
 ```
@@ -54,6 +55,7 @@ Server will pass email data as first argument to your handler. Email data scheme
 Startup:
 
 ```shell
+composer install
 php server.php
 ```
 
@@ -64,10 +66,11 @@ Server will be available on port specified in `config.php`.
 Startup:
 
 ```shell
-docker-compose up [-d]
+docker compose build
+docker compose up [-d]
 ```
 
-Server will be available on port `2525`
+Server will be available on port configured in `SMTP_PORT` ENV parameter (default is `2525`)
 
 ---
 
@@ -75,4 +78,4 @@ Server will be available on port `2525`
 
 * `debug`: Toggle logging to stdout
 * `port`: Server port. Should be `25` if you want to use docker
-* `handler_filename`: Absolute path to php file with handler. File should return instance of `Smtpot\HandlerInterface`
+* `handler_filename`: Absolute path to php file with handler. File should return instance of `SMTPot\Handlers\HandlerInterface`

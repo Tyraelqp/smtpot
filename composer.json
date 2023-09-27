@@ -1,0 +1,19 @@
+{
+    "name": "tyraelqp/smtpot",
+    "description": "A witch pot for your emails.",
+    "type": "project",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "SMTPot\\": "src/"
+        },
+        "files": ["src/functions.php"]
+    },
+    "authors": [
+        {
+            "name": "Sergey F.",
+            "email": "tyraelqp@gmail.com"
+        }
+    ],
+    "require": {}
+}
