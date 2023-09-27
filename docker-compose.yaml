@@ -5,14 +5,14 @@ networks:
     name: smtpot
 
 services:
-  php:
-    image: php:8.2.10-alpine
-    entrypoint: "php /app/server.php"
+  server:
+    build: ./docker
     container_name: smtpot
+    env_file: ./.env
     working_dir: /app
     volumes:
       - .:/app:cached
     networks:
       - smtpot
     ports:
-      - "2525:25"
+      - "${SMTP_PORT}:25"

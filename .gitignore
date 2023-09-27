@@ -1,4 +1,6 @@
 .idea
 config.php
-handler/*
-!handler/Smtpot/
+handlers/*
+!handlers/example.php
+.env
+/vendor/

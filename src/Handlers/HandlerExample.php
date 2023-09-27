@@ -1,8 +1,6 @@
 <?php
 
-namespace Smtpot;
-
-require_once __DIR__.'/AbstractHandler.php';
+namespace SMTPot\Handlers;
 
 class HandlerExample extends AbstractHandler
 {
@@ -22,5 +20,3 @@ class HandlerExample extends AbstractHandler
         ));
     }
 }
-
-return new HandlerExample();

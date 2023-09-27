@@ -3,8 +3,9 @@
 declare(ticks = 1);
 
 use Smtpot\HandlerInterface;
+use SMTPot\Handlers\HandlerInterface;
 
-require_once __DIR__ . '/handler/Smtpot/HandlerInterface.php';
+require_once __DIR__ . '/vendor/autoload.php';
 
 const CONFIG_FILENAME = __DIR__ . '/config.php';
 const NO_ACTIVITY_THRESHOLD = 2;
@@ -73,17 +74,6 @@ function respond(Socket $socket, int $code, string $response): void
 {
     debug("Server: $code $response");
     socket_write($socket, "$code $response" . "\n");
-}
-
-function debug(string $message): void
-{
-    global $config;
-
-    if (!($config['debug'] ?? false)) {
-        return;
-    }
-
-    error_log(trim($message));
 }
 
 function onClose(): void
@@ -187,7 +177,7 @@ while (true) {
                         ['; ', ''],
                         $value,
                     );
-                    $toSend[$i]['headers'][strtolower($name)] = trim($value);
+                    $toSend[$i]['headers'][strtolower(trim($name))][] = trim($value);
                 }
 
                 try {
@@ -241,7 +231,10 @@ while (true) {
                 respond($conn['socket'], 250, "Hello {$args[1]}");
                 break;
             case 'MAIL':
-                preg_match('/FROM:<([^>]+)>/', $args[1], $from);
+                if (!preg_match('/FROM:<([^>]+)>/', $args[1], $from)) {
+                    respond($conn, 501, "Syntax: MAIL FROM:<address>");
+                    break;
+                }
 
                 $toSend[$i] = [
                     'from' => $from[1],
@@ -253,7 +246,10 @@ while (true) {
                 respond($conn['socket'], 250, 'Ok');
                 break;
             case 'RCPT':
-                preg_match('/TO:<([^>]+)>/', $args[1], $to);
+                if (!preg_match('/TO:<([^>]+)>/', $args[1], $to)) {
+                    respond($conn, 501, "Syntax: RCPT TO:<address>");
+                    break;
+                }
 
                 $toSend[$i]['to'][] = $to[1];
 
