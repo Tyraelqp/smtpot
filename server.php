@@ -10,7 +10,7 @@ const CONFIG_FILENAME = __DIR__ . '/config.php';
 const NO_ACTIVITY_THRESHOLD = 2;
 const SLEEP_NO_ACTIVITY = 1e6 / 10;
 const SLEEP_HAS_ACTIVITY = 1e6 / 1000;
-const READ_TIMEOUT = 100;
+const READ_TIMEOUT = 10;
 
 try {
     if (!file_exists(CONFIG_FILENAME)) {
@@ -54,7 +54,7 @@ $port = $config['port'] ?? 25;
 $socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
 socket_set_option($socket, SOL_SOCKET, SO_REUSEADDR, 1);
 socket_bind($socket, '0.0.0.0', $port);
-socket_listen($socket);
+socket_listen($socket, SOMAXCONN);
 socket_set_nonblock($socket);
 
 debug("Server started at 0.0.0.0:$port");
@@ -72,7 +72,33 @@ while (true) {
         usleep(SLEEP_HAS_ACTIVITY);
     }
 
-    if ($conn = socket_accept($socket)) {
+    $socketsToWrite = $socketsToExcept = [];
+    $socketsToRead = [
+        $socket,
+        ...array_column($connections, 'socket'),
+    ];
+
+    socket_select(
+        $socketsToRead,
+        $socketsToWrite,
+        $socketsToExcept,
+        1,
+    );
+
+    if (empty($socketsToRead)) {
+        foreach ($connections as $i => $conn) {
+            if ($conn['lastInputTime'] < time() - READ_TIMEOUT) {
+                socket_close($conn['socket']);
+                unset($connections[$i], $toSend[$i]);
+                debug('Client disconnected by timeout');
+            }
+        }
+
+        continue;
+    }
+
+    if (in_array($socket, $socketsToRead, true)) {
+        $conn = socket_accept($socket);
         socket_set_nonblock($conn);
         socket_getpeername($conn, $clientIp);
         debug("Log: New connection from $clientIp");
@@ -89,11 +115,7 @@ while (true) {
     foreach ($connections as $i => $conn) {
         $clientSocket = $conn['socket'];
 
-        if ($conn['lastInputTime'] < time() - READ_TIMEOUT) {
-            socket_close($clientSocket);
-            unset($connections[$i], $toSend[$i]);
-            debug('Client disconnected by timeout');
-
+        if (!in_array($clientSocket, $socketsToRead, true)) {
             continue;
         }
 
@@ -112,7 +134,7 @@ while (true) {
                 }
 
                 $toSend[$i]['body'] .= $row;
-                $conn['lastInputTime'] = time();
+                $connections[$i]['lastInputTime'] = time();
             }
 
             if (isset($toSend[$i]) && preg_match('/\r\n\.\r\n/', $toSend[$i]['body'])) {
@@ -165,16 +187,13 @@ while (true) {
             continue;
         }
 
-        $conn['lastInputTime'] = time();
-
         debug("Client: $input");
 
-        preg_match('/^(\w+)(.+)?\r\n/', $input, $args);
-
-        if (empty($args)) {
+        if (!preg_match('/^(\w+)(.+)?\r\n/', $input, $args)) {
             continue;
         }
 
+        $connections[$i]['lastInputTime'] = time();
         $lastInputTime = time();
 
         array_shift($args);
