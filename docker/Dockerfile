@@ -6,7 +6,7 @@ COPY ./entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh && \
     apk add --no-cache bash && \
-    install-php-extensions pcntl sockets
+    install-php-extensions sockets
 
 WORKDIR /app
 EXPOSE 25

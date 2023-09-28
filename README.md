@@ -33,9 +33,14 @@ Now you can change default configuration for your needs (WARNING! Do not change 
 
 # Handlers
 
+### General information
+
 You can set your email handler in `config.php` (Check [Configuration reference](#configuration-reference) section).
 
-Server will pass email data as first argument to your handler. Email data scheme:
+Handler should implement `SMTPot\Handlers\HandlerInterface` interface.
+You can use `SMTPot\Handlers\AbstractHandler` class as base class for your handler.
+
+Server will pass email message data as first argument to your handler's `handleMessage` method. Email data scheme:
 
 ```
 {
@@ -45,6 +50,15 @@ Server will pass email data as first argument to your handler. Email data scheme
     "body": string
 }
 ```
+
+### Custom command
+
+Also, you can create custom commands inside your handler.
+These commands can be executed by opening new telnet session and sending `HNDL some_command with args` command to server.
+
+`some_command with args` will be passed to your handler's `handleCommand` method as first argument.
+
+See [HandlerExample](src/Handlers/HandlerExample.php) for example.
 
 ---
 
@@ -76,6 +90,7 @@ Server will be available on port configured in `SMTP_PORT` ENV parameter (defaul
 
 ## Configuration reference
 
-* `debug`: Toggle logging to stdout
-* `port`: Server port. Should be `25` if you want to use docker
-* `handler_filename`: Absolute path to php file with handler. File should return instance of `SMTPot\Handlers\HandlerInterface`
+* `debug`: Toggle logging to stdout.
+* `port`: Server port. Should be `25` if you want to use docker.
+* `read_timeout`: Timeout for reading data from socket. Socket will be closed if timeout exceeded.
+* `handler_filename`: Absolute path to php file with handler. File should return instance of `SMTPot\Handlers\HandlerInterface`.

@@ -29,6 +29,19 @@ function respond(Socket $socket, int $code, string $response): void
     socket_write($socket, "$code $response" . "\n");
 }
 
+function disconnectClient(Socket $socket, int $index, string $reason = null): void
+{
+    global $connections;
+    global $toSend;
+
+    socket_close($socket);
+    unset($connections[$index], $toSend[$index]);
+
+    if (null !== $reason) {
+        debug('Client disconnected by timeout');
+    }
+}
+
 function debug(string $message): void
 {
     global $config;
@@ -38,19 +51,4 @@ function debug(string $message): void
     }
 
     error_log(trim($message));
-}
-
-
-function onClose(): void
-{
-    global $connections;
-    global $socket;
-
-    foreach ($connections as $connection) {
-        socket_close($connection);
-    }
-
-    socket_close($socket);
-    debug('Server stopped');
-    exit(0);
 }

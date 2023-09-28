@@ -1,16 +1,16 @@
 <?php
 
-declare(ticks = 1);
-
 use SMTPot\Handlers\HandlerInterface;
 
 require_once __DIR__ . '/vendor/autoload.php';
 
 const CONFIG_FILENAME = __DIR__ . '/config.php';
+const DEFAULT_PORT = 25;
 const NO_ACTIVITY_THRESHOLD = 2;
 const SLEEP_NO_ACTIVITY = 1e6 / 10;
 const SLEEP_HAS_ACTIVITY = 1e6 / 1000;
-const READ_TIMEOUT = 10;
+const SOCKET_READ_DEFAULT_TIMEOUT = 10;
+const SOCKET_SELECT_TIMEOUT = 1;
 
 try {
     if (!file_exists(CONFIG_FILENAME)) {
@@ -46,11 +46,7 @@ try {
     exit(1);
 }
 
-pcntl_signal(SIGTERM, "onClose");
-pcntl_signal(SIGHUP, "onClose");
-pcntl_signal(SIGINT, "onClose");
-
-$port = $config['port'] ?? 25;
+$port = $config['port'] ?? DEFAULT_PORT;
 $socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
 socket_set_option($socket, SOL_SOCKET, SO_REUSEADDR, 1);
 socket_bind($socket, '0.0.0.0', $port);
@@ -59,6 +55,7 @@ socket_set_nonblock($socket);
 
 debug("Server started at 0.0.0.0:$port");
 
+$socketReadTimeout = $config['read_timeout'] ?? SOCKET_READ_DEFAULT_TIMEOUT;
 $connections = [];
 $toSend = [];
 $sendCount = 0;
@@ -82,15 +79,13 @@ while (true) {
         $socketsToRead,
         $socketsToWrite,
         $socketsToExcept,
-        1,
+        SOCKET_SELECT_TIMEOUT,
     );
 
     if (empty($socketsToRead)) {
         foreach ($connections as $i => $conn) {
-            if ($conn['lastInputTime'] < time() - READ_TIMEOUT) {
-                socket_close($conn['socket']);
-                unset($connections[$i], $toSend[$i]);
-                debug('Client disconnected by timeout');
+            if ($conn['lastInputTime'] < time() - $socketReadTimeout) {
+                disconnectClient($conn['socket'], $i, 'Client disconnected by timeout');
             }
         }
 
@@ -126,10 +121,7 @@ while (true) {
 
             while (false !== $row = readInput($clientSocket)) {
                 if (empty($row)) {
-                    socket_close($clientSocket);
-                    unset($connections[$i], $toSend[$i]);
-                    debug('Client disconnected');
-
+                    disconnectClient($clientSocket, $i, 'Client disconnected');
                     break;
                 }
 
@@ -181,9 +173,7 @@ while (true) {
         }
 
         if (empty($input)) {
-            socket_close($clientSocket);
-            unset($connections[$i], $toSend[$i]);
-            debug('Client disconnected');
+            disconnectClient($clientSocket, $i, 'Client disconnected');
             continue;
         }
 
@@ -240,15 +230,14 @@ while (true) {
                 break;
             case 'QUIT':
                 respond($clientSocket, 221, 'Bye');
-                socket_close($clientSocket);
-                unset($connections[$i], $toSend[$i]);
+                disconnectClient($clientSocket, $i);
                 break;
             case 'NOOP':
                 respond($clientSocket, 250, 'Ok');
                 break;
             case 'HNDL':
                 if (1 === count($args)) {
-                    respond($clientSocket, 501, "Syntax: {$args[0]} payload");
+                    respond($clientSocket, 501, "Syntax: $args[0] payload");
                     break;
                 }
 
