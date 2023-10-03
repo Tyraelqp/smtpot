@@ -48,9 +48,30 @@ try {
 
 $port = $config['port'] ?? DEFAULT_PORT;
 $socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+
+if (false === $socket) {
+    throw new RuntimeException(sprintf(
+        'Failed to create socket: %s',
+        socket_strerror(socket_last_error()),
+    ));
+}
+
 socket_set_option($socket, SOL_SOCKET, SO_REUSEADDR, 1);
-socket_bind($socket, '0.0.0.0', $port);
-socket_listen($socket, SOMAXCONN);
+
+if (!socket_bind($socket, '0.0.0.0', $port)) {
+    throw new RuntimeException(sprintf(
+        'Failed to bind socket to port: %s',
+        socket_strerror(socket_last_error()),
+    ));
+}
+
+if (!socket_listen($socket, SOMAXCONN)) {
+    throw new RuntimeException(sprintf(
+        'Failed to listen socket: %s',
+        socket_strerror(socket_last_error()),
+    ));
+}
+
 socket_set_nonblock($socket);
 
 debug("Server started at 0.0.0.0:$port");
