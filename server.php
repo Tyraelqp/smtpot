@@ -51,7 +51,7 @@ pcntl_signal(SIGHUP, "onClose");
 pcntl_signal(SIGINT, "onClose");
 
 $port = $config['port'] ?? 25;
-$socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+$socket = @socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
 
 if (false === $socket) {
     throw new RuntimeException(sprintf(
@@ -62,14 +62,14 @@ if (false === $socket) {
 
 socket_set_option($socket, SOL_SOCKET, SO_REUSEADDR, 1);
 
-if (!socket_bind($socket, '0.0.0.0', $port)) {
+if (!@socket_bind($socket, '0.0.0.0', $port)) {
     throw new RuntimeException(sprintf(
         'Failed to bind socket to port: %s',
         socket_strerror(socket_last_error()),
     ));
 }
 
-if (!socket_listen($socket, SOMAXCONN)) {
+if (!@socket_listen($socket, SOMAXCONN)) {
     throw new RuntimeException(sprintf(
         'Failed to listen socket: %s',
         socket_strerror(socket_last_error()),
